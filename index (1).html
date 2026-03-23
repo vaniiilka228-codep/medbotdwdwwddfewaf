@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MedHelper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: #1a1a3e;
+            --bg-card-hover: #222255;
+            --neon-purple: #b347ff;
+            --neon-blue: #4d7cff;
+            --neon-pink: #ff47ab;
+            --neon-cyan: #47ffdd;
+            --neon-green: #47ff83;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0cc;
+            --text-muted: #6a6a99;
+            --border-color: rgba(179, 71, 255, 0.2);
+            --glow-purple: 0 0 20px rgba(179, 71, 255, 0.3);
+            --glow-blue: 0 0 20px rgba(77, 124, 255, 0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(179, 71, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(77, 124, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(255, 71, 171, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 0 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 0 16px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+            letter-spacing: -0.5px;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* Search */
+        .search-box {
+            position: relative;
+            margin: 12px 0 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 14px 20px 14px 48px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--neon-purple);
+            box-shadow: var(--glow-purple);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            opacity: 0.5;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scrollbar-width: none;
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            padding: 10px 18px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .tab:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue));
+            color: white;
+            border-color: transparent;
+            box-shadow: var(--glow-purple);
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+
+        .stat-item .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-item .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Product card */
+        .product-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 18px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--neon-purple), var(--neon-blue), var(--neon-pink));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .product-card:hover::before,
+        .product-card:active::before {
+            opacity: 1;
+        }
+
+        .product-card:hover {
+            border-color: rgba(179, 71, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: var(--glow-purple);
+        }
+
+        .product-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .product-card .card-emoji {
+            font-size: 36px;
+            margin-right: 14px;
+            filter: drop-shadow(0 0 8px rgba(179, 71, 255, 0.4));
+        }
+
+        .product-card .card-info {
+            flex: 1;
+        }
+
+        .product-card .card-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.3;
+        }
+
+        .product-card .card-category {
+            font-size: 12px;
+            color: var(--neon-purple);
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .product-card .card-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin: 8px 0 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .product-card .card-prices {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .price-btn {
+            padding: 8px 14px;
+            background: rgba(179, 71, 255, 0.1);
+            border: 1px solid rgba(179, 71, 255, 0.3);
+            border-radius: 10px;
+            color: var(--neon-purple);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .price-btn:hover,
+        .price-btn:active {
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue));
+            color: white;
+            border-color: transparent;
+            box-shadow: var(--glow-purple);
+            transform: scale(1.05);
+        }
+
+        .price-btn .dosage {
+            display: block;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .price-btn .price {
+            display: block;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        /* Popular badge */
+        .popular-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: linear-gradient(135deg, #ff6b35, #ff47ab);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* Recipe button */
+        .recipe-btn {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background: rgba(71, 255, 221, 0.1);
+            border: 1px solid rgba(71, 255, 221, 0.3);
+            border-radius: 10px;
+            color: var(--neon-cyan);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .recipe-btn:hover {
+            background: rgba(71, 255, 221, 0.2);
+        }
+
+        /* Cart button (floating) */
+        .cart-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 20px rgba(179, 71, 255, 0.5);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        .cart-float:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 30px rgba(179, 71, 255, 0.7);
+        }
+
+        .cart-float .cart-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--neon-pink);
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 12px 24px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 200;
+            transition: transform 0.3s ease;
+            box-shadow: 0 0 20px rgba(71, 255, 131, 0.2);
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--neon-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .product-card {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .product-card:nth-child(2) { animation-delay: 0.05s; }
+        .product-card:nth-child(3) { animation-delay: 0.1s; }
+        .product-card:nth-child(4) { animation-delay: 0.15s; }
+        .product-card:nth-child(5) { animation-delay: 0.2s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 MedHelper</h1>
+            <div class="subtitle">Ваш надёжный помощник</div>
+        </div>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <div class="stat-value" id="statBalance">0</div>
+                <div class="stat-label">Баланс ₽</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statOrders">0</div>
+                <div class="stat-label">Заказов</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statCart">0</div>
+                <div class="stat-label">В корзине</div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Поиск препаратов...">
+        </div>
+
+        <div class="tabs" id="tabs">
+            <div class="tab active" data-cat="all">Все</div>
+            <div class="tab" data-cat="popular">🔥 Хиты</div>
+        </div>
+
+        <div id="products">
+            <div class="loading">
+                <div class="spinner"></div>
+                Загрузка каталога...
+            </div>
+        </div>
+    </div>
+
+    <div class="cart-float" id="cartFloat" onclick="openCart()" style="display:none;">
+        🛒
+        <div class="cart-badge" id="cartBadge">0</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        tg.setHeaderColor('#0a0a1a');
+        tg.setBackgroundColor('#0a0a1a');
+
+        const API_BASE = window.location.origin;
+        let allProducts = [];
+        let cartCount = 0;
+        let currentCategory = 'all';
+        let userId = tg.initDataUnsafe?.user?.id || 0;
+
+        // Load data
+        async function init() {
+            await Promise.all([loadCatalog(), loadUser(), loadCart()]);
+        }
+
+        async function loadCatalog() {
+            try {
+                const resp = await fetch(`${API_BASE}/api/catalog`);
+                const data = await resp.json();
+                if (data.ok) {
+                    allProducts = data.products;
+                    buildTabs();
+                    renderProducts();
+                }
+            } catch (e) {
+                document.getElementById('products').innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">😔</div>Ошибка загрузки</div>';
+            }
+        }
+
+        async function loadUser() {
+            if (!userId) return;
+            try {
+                const resp = await fetch(`${API_BASE}/api/user?user_id=${userId}`);
+                const data = await resp.json();
+                if (data.ok) {
+                    document.getElementById('statBalance').textContent = Math.round(data.user.balance);
+                    document.getElementById('statOrders').textContent = data.user.orders;
+                }
+            } catch (e) {}
+        }
+
+        async function loadCart() {
+            if (!userId) return;
+            try {
+                const resp = await fetch(`${API_BASE}/api/cart?user_id=${userId}`);
+                const data = await resp.json();
+                if (data.ok) {
+                    cartCount = data.count;
+                    updateCartBadge();
+                    document.getElementById('statCart').textContent = data.count;
+                }
+            } catch (e) {}
+        }
+
+        function buildTabs() {
+            const cats = [...new Set(allProducts.map(p => p.category))];
+            const tabsEl = document.getElementById('tabs');
+            tabsEl.innerHTML = '<div class="tab active" data-cat="all">Все</div>' +
+                '<div class="tab" data-cat="popular">🔥 Хиты</div>';
+
+            cats.forEach(cat => {
+                const tab = document.createElement('div');
+                tab.className = 'tab';
+                tab.dataset.cat = cat;
+                tab.textContent = cat;
+                tabsEl.appendChild(tab);
+            });
+
+            tabsEl.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabsEl.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentCategory = tab.dataset.cat;
+                    renderProducts();
+                });
+            });
+        }
+
+        function renderProducts(searchQuery = '') {
+            let filtered = allProducts;
+
+            if (currentCategory === 'popular') {
+                filtered = filtered.filter(p => p.is_popular);
+            } else if (currentCategory !== 'all') {
+                filtered = filtered.filter(p => p.category === currentCategory);
+            }
+
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                filtered = filtered.filter(p =>
+                    p.name.toLowerCase().includes(q) ||
+                    p.desc.toLowerCase().includes(q) ||
+                    p.category.toLowerCase().includes(q)
+                );
+            }
+
+            const container = document.getElementById('products');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Ничего не найдено</div>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(p => {
+                const prices = p.prices || {};
+                const priceButtons = Object.entries(prices).map(([dosage, price]) =>
+                    `<div class="price-btn" onclick="addToCart(event, ${p.id}, '${dosage}', ${price})">
+                        <span class="dosage">${dosage}</span>
+                        <span class="price">${price}₽</span>
+                    </div>`
+                ).join('');
+
+                const recipeBtn = p.recipe_price > 0 ?
+                    `<div class="recipe-btn" onclick="addToCart(event, ${p.id}, 'Рецепт', ${p.recipe_price})">
+                        📋 Электронный рецепт — ${p.recipe_price}₽
+                    </div>` : '';
+
+                const popularBadge = p.is_popular ? '<div class="popular-badge">🔥 ХИТ</div>' : '';
+
+                return `
+                    <div class="product-card">
+                        ${popularBadge}
+                        <div class="card-header">
+                            <span class="card-emoji">${p.emoji}</span>
+                            <div class="card-info">
+                                <div class="card-name">${p.name}</div>
+                                <div class="card-category">${p.category}</div>
+                            </div>
+                        </div>
+                        <div class="card-desc">${p.desc}</div>
+                        <div class="card-prices">${priceButtons}</div>
+                        ${recipeBtn}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function addToCart(event, productId, dosage, price) {
+            event.stopPropagation();
+
+            const btn = event.currentTarget;
+            btn.style.transform = 'scale(0.9)';
+            setTimeout(() => btn.style.transform = '', 200);
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/cart/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: userId,
+                        product_id: productId,
+                        item_type: dosage === 'Рецепт' ? 'recipe' : 'drug',
+                        dosage: dosage,
+                        price: price,
+                        quantity: 1
+                    })
+                });
+
+                const data = await resp.json();
+                if (data.ok) {
+                    cartCount = data.cart_count;
+                    updateCartBadge();
+                    document.getElementById('statCart').textContent = cartCount;
+                    showToast(`✅ Добавлено в корзину!`);
+
+                    // Haptic feedback
+                    if (tg.HapticFeedback) {
+                        tg.HapticFeedback.impactOccurred('light');
+                    }
+                }
+            } catch (e) {
+                showToast('❌ Ошибка');
+            }
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cartBadge');
+            const float = document.getElementById('cartFloat');
+            badge.textContent = cartCount;
+            float.style.display = cartCount > 0 ? 'flex' : 'none';
+        }
+
+        function openCart() {
+            tg.sendData(JSON.stringify({action: 'checkout'}));
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        // Search
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                renderProducts(e.target.value);
+            }, 300);
+        });
+
+        // Init
+        init();
+    </script>
+</body>
+</html>

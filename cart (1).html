@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Корзина — MedHelper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+        <h1>🛒 Корзина</h1>
+        <p id="subtitle">Загрузка...</p>
+    </div>
+
+    <div id="cart-items"></div>
+
+    <div class="bottom-bar" id="bottom-bar" style="display:none;">
+        <div>
+            <div class="bottom-total">Итого</div>
+            <div class="bottom-total-amount" id="total">0₽</div>
+            <div class="bottom-total-stars" id="total-stars">0⭐</div>
+        </div>
+        <button class="bottom-btn" id="checkout-btn">Оформить →</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="nav-bar" id="nav">
+        <a href="/index.html" class="nav-item"><span class="nav-icon">🏠</span><span>Главная</span></a>
+        <a href="/catalog.html" class="nav-item"><span class="nav-icon">💊</span><span>Каталог</span></a>
+        <a href="/cart.html" class="nav-item active"><span class="nav-icon">🛒</span><span>Корзина</span></a>
+        <a href="/referral.html" class="nav-item"><span class="nav-icon">👥</span><span>Рефералы</span></a>
+    </div>
+
+    <script>
+    (function() {
+        var tg = null;
+        try {
+            tg = window.Telegram && window.Telegram.WebApp;
+            if (tg) { tg.ready(); tg.expand(); }
+        } catch(e) {}
+
+        var cart = [];
+        try { cart = JSON.parse(localStorage.getItem('mh_cart') || '[]'); } catch(e) { cart = []; }
+
+        function render() {
+            var el = document.getElementById('cart-items');
+            var bar = document.getElementById('bottom-bar');
+            var nav = document.getElementById('nav');
+            var sub = document.getElementById('subtitle');
+
+            if (!cart.length) {
+                el.innerHTML =
+                    '<div class="empty-state">' +
+                    '<div class="empty-icon">🛒</div>' +
+                    '<div class="empty-title">Корзина пуста</div>' +
+                    '<div class="empty-text">Добавьте препараты из каталога</div>' +
+                    '<a href="/catalog.html" class="empty-btn">💊 Перейти в каталог</a></div>';
+                bar.style.display = 'none';
+                nav.style.display = 'flex';
+                sub.textContent = 'Пусто';
+                try { if (tg) tg.MainButton.hide(); } catch(e) {}
+                return;
+            }
+
+            var total = 0, qty = 0;
+            var h = '';
+            for (var i = 0; i < cart.length; i++) {
+                var it = cart[i];
+                var st = it.price * it.qty;
+                total += st; qty += it.qty;
+                var icon = it.type === 'recipe' ? '📜' : (it.emoji || '💊');
+                var dose = it.dosage && it.dosage !== '-' ? ' • ' + it.dosage : '';
+                var tp = it.type === 'recipe' ? ' (рецепт)' : '';
+
+                h += '<div class="cart-item">' +
+                    '<div class="cart-item-emoji">' + icon + '</div>' +
+                    '<div class="cart-item-info">' +
+                    '<div class="cart-item-name">' + it.name + tp + '</div>' +
+                    '<div class="cart-item-detail">' + it.price + '₽' + dose + '</div>' +
+                    '<div class="cart-item-price">' + st + '₽ (' + st + '⭐)</div></div>' +
+                    '<div class="cart-qty">' +
+                    '<button class="cart-qty-btn minus" data-idx="' + i + '" data-dir="-1">−</button>' +
+                    '<span class="cart-qty-val">' + it.qty + '</span>' +
+                    '<button class="cart-qty-btn plus" data-idx="' + i + '" data-dir="1">+</button></div>' +
+                    '<span class="cart-delete" data-del="' + i + '">🗑</span></div>';
+            }
+
+            h += '<div style="text-align:center;padding:16px;">' +
+                '<button id="clear-btn" style="background:none;border:2px solid var(--red,#ff3b30);color:var(--red,#ff3b30);padding:12px 28px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;">🗑 Очистить корзину</button></div>';
+
+            el.innerHTML = h;
+            sub.textContent = qty + ' товаров на ' + total + '₽';
+            document.getElementById('total').textContent = total + '₽';
+            document.getElementById('total-stars').textContent = total + '⭐';
+            bar.style.display = 'flex';
+            nav.style.display = 'none';
+
+            // Events
+            el.onclick = function(ev) {
+                var qBtn = ev.target.closest('[data-dir]');
+                if (qBtn) {
+                    var idx = parseInt(qBtn.getAttribute('data-idx'));
+                    var dir = parseInt(qBtn.getAttribute('data-dir'));
+                    cart[idx].qty += dir;
+                    if (cart[idx].qty <= 0) cart.splice(idx, 1);
+                    save(); render(); haptic('light');
+                    return;
+                }
+                var del = ev.target.closest('[data-del]');
+                if (del) {
+                    cart.splice(parseInt(del.getAttribute('data-del')), 1);
+                    save(); render(); showToast('🗑 Удалено'); haptic('light');
+                    return;
+                }
+                if (ev.target.id === 'clear-btn' || ev.target.closest('#clear-btn')) {
+                    cart = []; save(); render(); showToast('🗑 Корзина очищена');
+                }
+            };
+
+            try {
+                if (tg) {
+                    tg.MainButton.setText('Оформить — ' + total + '₽ (' + total + '⭐)');
+                    tg.MainButton.show();
+                }
+            } catch(e) {}
+        }
+
+        function checkout() {
+            if (!cart.length) return;
+            var total = 0;
+            var items = [];
+            for (var i = 0; i < cart.length; i++) {
+                total += cart[i].price * cart[i].qty;
+                items.push({
+                    name: cart[i].name,
+                    type: cart[i].type,
+                    dosage: cart[i].dosage,
+                    price: cart[i].price,
+                    quantity: cart[i].qty
+                });
+            }
+            try {
+                if (tg) {
+                    tg.sendData(JSON.stringify({ action: 'checkout', items: items, total: total }));
+                    cart = [];
+                    save();
+                    haptic('success');
+                } else {
+                    showToast('❌ Откройте через Telegram');
+                }
+            } catch(e) {
+                showToast('❌ Ошибка: ' + e.message);
+            }
+        }
+
+        document.getElementById('checkout-btn').onclick = checkout;
+        try {
+            if (tg) {
+                tg.MainButton.onClick(checkout);
+                tg.BackButton.show();
+                tg.BackButton.onClick(function() { window.location.href = '/index.html'; });
+            }
+        } catch(e) {}
+
+        function save() {
+            try { localStorage.setItem('mh_cart', JSON.stringify(cart)); } catch(e) {}
+        }
+
+        function showToast(t) {
+            var el = document.getElementById('toast');
+            el.textContent = t;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, 2500);
+        }
+
+        function haptic(s) {
+            try {
+                if (tg && tg.HapticFeedback) {
+                    if (s === 'success') tg.HapticFeedback.notificationOccurred('success');
+                    else tg.HapticFeedback.impactOccurred(s);
+                }
+            } catch(e) {}
+        }
+
+        render();
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Каталог — MedHelper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>💊 Каталог</h1>
+        <p>32 препарата • Рецепты • Доставка</p>
+    </div>
+
+    <div class="search-container">
+        <input type="text" class="search-box" id="search" placeholder="Поиск препарата...">
+    </div>
+
+    <div class="section-title">Категории</div>
+    <div class="categories-scroll" id="categories"></div>
+
+    <div class="section-title" id="products-title">Все препараты</div>
+    <div class="products-list" id="products">
+        <div class="loading-state">
+            <div class="loading-spinner">💊</div>
+            <p style="margin-top:12px;">Загрузка каталога...</p>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content" id="modal-content"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="nav-bar">
+        <a href="/index.html" class="nav-item"><span class="nav-icon">🏠</span><span>Главная</span></a>
+        <a href="/catalog.html" class="nav-item active"><span class="nav-icon">💊</span><span>Каталог</span></a>
+        <a href="/cart.html" class="nav-item" style="position:relative;"><span class="nav-icon">🛒</span><span>Корзина</span><span class="nav-badge" id="badge" style="display:none;">0</span></a>
+        <a href="/referral.html" class="nav-item"><span class="nav-icon">👥</span><span>Рефералы</span></a>
+    </div>
+
+    <script>
+    (function() {
+        var tg = null;
+        try {
+            tg = window.Telegram && window.Telegram.WebApp;
+            if (tg) { tg.ready(); tg.expand(); }
+        } catch(e) {}
+
+        var PRODUCTS = [];
+        var currentCat = 'all';
+        var cart = [];
+        var mQty = 1;
+        var mProd = null;
+        var mDose = null;
+
+        try { cart = JSON.parse(localStorage.getItem('mh_cart') || '[]'); } catch(e) { cart = []; }
+
+        var CAT_EMOJIS = {
+            'all':'🏥','Антиконвульсанты':'💊','Миорелаксанты':'💪','Бензодиазепины':'🧬',
+            'Антидепрессанты':'🧠','Анальгетики':'💉','Ноотропы':'🧪','Снотворные':'😴',
+            'Холинолитики':'⚗️','Антипсихотики':'🏥','Анксиолитики':'🌿'
+        };
+
+        function load() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/products', true);
+            xhr.timeout = 10000;
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        PRODUCTS = JSON.parse(xhr.responseText);
+                        renderCats();
+                        renderProducts();
+                        updateBadge();
+                    } catch(e) {
+                        showError('Ошибка данных');
+                    }
+                } else {
+                    showError('Сервер вернул ' + xhr.status);
+                }
+            };
+            xhr.onerror = function() { showError('Нет соединения с сервером'); };
+            xhr.ontimeout = function() { showError('Таймаут загрузки'); };
+            xhr.send();
+        }
+
+        function showError(msg) {
+            document.getElementById('products').innerHTML =
+                '<div class="empty-state">' +
+                '<div class="empty-icon">⚠️</div>' +
+                '<div class="empty-title">' + msg + '</div>' +
+                '<div class="empty-text">Попробуйте обновить страницу</div>' +
+                '<button onclick="location.reload()" style="padding:14px 28px;border:none;border-radius:14px;background:var(--btn,#3390ec);color:var(--btn-text,#fff);font-size:15px;font-weight:700;cursor:pointer;">🔄 Обновить</button>' +
+                '</div>';
+        }
+
+        function getCats() {
+            var s = {};
+            for (var i = 0; i < PRODUCTS.length; i++) s[PRODUCTS[i].category] = 1;
+            return ['all'].concat(Object.keys(s));
+        }
+
+        function renderCats() {
+            var el = document.getElementById('categories');
+            var cats = getCats();
+            var h = '';
+            for (var i = 0; i < cats.length; i++) {
+                var c = cats[i];
+                var n = c === 'all' ? 'Все' : c;
+                var e = CAT_EMOJIS[c] || '📦';
+                var a = c === currentCat ? ' active' : '';
+                h += '<button class="cat-chip' + a + '" data-cat="' + c + '">' + e + ' ' + n + '</button>';
+            }
+            el.innerHTML = h;
+
+            // Event delegation
+            el.onclick = function(ev) {
+                var btn = ev.target.closest('.cat-chip');
+                if (btn) {
+                    currentCat = btn.getAttribute('data-cat');
+                    renderCats();
+                    renderProducts();
+                    haptic('light');
+                }
+            };
+        }
+
+        function renderProducts() {
+            var el = document.getElementById('products');
+            var q = document.getElementById('search').value.toLowerCase();
+            var title = document.getElementById('products-title');
+            var f = [];
+
+            for (var i = 0; i < PRODUCTS.length; i++) {
+                var p = PRODUCTS[i];
+                if (currentCat !== 'all' && p.category !== currentCat) continue;
+                if (q && p.name.toLowerCase().indexOf(q) === -1 && p.desc.toLowerCase().indexOf(q) === -1) continue;
+                f.push(p);
+            }
+
+            title.textContent = (currentCat === 'all' ? 'Все препараты' : currentCat) + ' (' + f.length + ')';
+
+            if (!f.length) {
+                el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Ничего не найдено</div><div class="empty-text">Попробуйте другой запрос</div></div>';
+                return;
+            }
+
+            var h = '';
+            for (var j = 0; j < f.length; j++) {
+                var p = f[j];
+                var prices = '';
+                var keys = Object.keys(p.prices || {});
+                for (var k = 0; k < keys.length; k++) {
+                    prices += '<span class="price-tag">' + keys[k] + ' — ' + p.prices[keys[k]] + '₽</span>';
+                }
+                if (p.recipe_price) {
+                    prices += '<span class="price-tag recipe">📜 ' + p.recipe_price + '₽</span>';
+                }
+
+                h += '<div class="product-card animate-in" style="animation-delay:' + (j * 0.04) + 's">' +
+                    '<div class="product-emoji">' + (p.emoji || '💊') + '</div>' +
+                    '<div class="product-info">' +
+                    '<div class="product-category">' + p.category + '</div>' +
+                    '<div class="product-name">' + p.name + '</div>' +
+                    '<div class="product-desc">' + p.desc + '</div>' +
+                    '<div class="product-prices">' + prices + '</div>' +
+                    '<div class="product-actions">' +
+                    '<button class="add-btn" data-action="drug" data-id="' + p.id + '">💊 Купить</button>' +
+                    (p.recipe_price ? '<button class="add-btn recipe-btn" data-action="recipe" data-id="' + p.id + '">📜 Рецепт</button>' : '') +
+                    '</div></div></div>';
+            }
+            el.innerHTML = h;
+
+            // Event delegation for buttons
+            el.onclick = function(ev) {
+                var btn = ev.target.closest('[data-action]');
+                if (!btn) return;
+                var action = btn.getAttribute('data-action');
+                var id = parseInt(btn.getAttribute('data-id'));
+                if (action === 'drug') openDrugModal(id);
+                else if (action === 'recipe') openRecipeModal(id);
+            };
+        }
+
+        function findProduct(id) {
+            for (var i = 0; i < PRODUCTS.length; i++) {
+                if (PRODUCTS[i].id === id) return PRODUCTS[i];
+            }
+            return null;
+        }
+
+        // ===== DRUG MODAL =====
+        window.openDrugModal = function(id) {
+            var p = findProduct(id);
+            if (!p) return;
+            mProd = p; mQty = 1; mDose = null;
+
+            var dosages = '';
+            var keys = Object.keys(p.prices);
+            for (var k = 0; k < keys.length; k++) {
+                var d = keys[k], pr = p.prices[d];
+                dosages += '<div class="dosage-option" data-dose="' + d + '" data-price="' + pr + '">' +
+                    '<div><div class="dosage-name">💊 ' + d + '</div></div>' +
+                    '<div><div class="dosage-price">' + pr + '₽</div><div class="dosage-stars">' + pr + '⭐</div></div></div>';
+            }
+
+            var mc = document.getElementById('modal-content');
+            mc.innerHTML =
+                '<div class="modal-title">' + (p.emoji || '💊') + ' ' + p.name + '</div>' +
+                '<div style="font-size:13px;color:var(--hint);margin-bottom:16px;text-align:center;">' + p.desc + '</div>' +
+                '<div id="dose-list">' + dosages + '</div>' +
+                '<div id="qty-sec" style="display:none;">' +
+                '<div class="qty-row">' +
+                '<button class="qty-btn minus" id="q-minus">−</button>' +
+                '<span class="qty-value" id="q-val">1</span>' +
+                '<button class="qty-btn" id="q-plus">+</button></div>' +
+                '<button class="modal-add-btn" id="q-add">🛒 Выберите дозировку</button></div>';
+
+            // Dosage click
+            document.getElementById('dose-list').onclick = function(ev) {
+                var opt = ev.target.closest('.dosage-option');
+                if (!opt) return;
+                mDose = opt.getAttribute('data-dose');
+                var opts = document.querySelectorAll('.dosage-option');
+                for (var i = 0; i < opts.length; i++) opts[i].className = 'dosage-option';
+                opt.className = 'dosage-option selected';
+                document.getElementById('qty-sec').style.display = 'block';
+                updDrugBtn();
+                haptic('light');
+            };
+
+            document.getElementById('q-minus').onclick = function() { mQty = Math.max(1, mQty - 1); document.getElementById('q-val').textContent = mQty; updDrugBtn(); haptic('light'); };
+            document.getElementById('q-plus').onclick = function() { mQty++; document.getElementById('q-val').textContent = mQty; updDrugBtn(); haptic('light'); };
+            document.getElementById('q-add').onclick = function() { addDrug(); };
+
+            document.getElementById('modal').classList.add('show');
+            haptic('light');
+        };
+
+        function updDrugBtn() {
+            if (!mDose || !mProd) return;
+            var pr = mProd.prices[mDose];
+            var t = pr * mQty;
+            document.getElementById('q-add').textContent = '🛒 В корзину — ' + t + '₽ (' + t + '⭐)';
+        }
+
+        function addDrug() {
+            if (!mProd || !mDose) return;
+            var pr = mProd.prices[mDose];
+            var found = false;
+            for (var i = 0; i < cart.length; i++) {
+                if (cart[i].id === mProd.id && cart[i].dosage === mDose && cart[i].type === 'drug') {
+                    cart[i].qty += mQty;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                cart.push({ id: mProd.id, name: mProd.name, emoji: mProd.emoji || '💊', type: 'drug', dosage: mDose, price: pr, qty: mQty });
+            }
+            saveCart();
+            closeModal();
+            showToast('✅ ' + mProd.name + ' ' + mDose + ' × ' + mQty);
+            haptic('success');
+        }
+
+        // ===== RECIPE MODAL =====
+        window.openRecipeModal = function(id) {
+            var p = findProduct(id);
+            if (!p) return;
+            mProd = p; mQty = 1;
+
+            var mc = document.getElementById('modal-content');
+            mc.innerHTML =
+                '<div class="modal-title">📜 Рецепт: ' + p.name + '</div>' +
+                '<div style="font-size:13px;color:var(--hint);margin-bottom:16px;text-align:center;">' + p.desc + '</div>' +
+                '<div style="text-align:center;font-size:28px;font-weight:800;color:var(--orange);margin:16px 0;">' +
+                p.recipe_price + '₽ <span style="font-size:14px;color:var(--hint);">(' + p.recipe_price + '⭐)</span></div>' +
+                '<div class="qty-row">' +
+                '<button class="qty-btn minus" id="rq-minus">−</button>' +
+                '<span class="qty-value" id="rq-val">1</span>' +
+                '<button class="qty-btn" id="rq-plus">+</button></div>' +
+                '<button class="modal-add-btn" id="rq-add" style="background:var(--orange);">📜 Купить рецепт — ' + p.recipe_price + '₽</button>';
+
+            document.getElementById('rq-minus').onclick = function() {
+                mQty = Math.max(1, mQty - 1);
+                document.getElementById('rq-val').textContent = mQty;
+                var t = mProd.recipe_price * mQty;
+                document.getElementById('rq-add').textContent = '📜 Купить рецепт — ' + t + '₽';
+                haptic('light');
+            };
+            document.getElementById('rq-plus').onclick = function() {
+                mQty = Math.min(5, mQty + 1);
+                document.getElementById('rq-val').textContent = mQty;
+                var t = mProd.recipe_price * mQty;
+                document.getElementById('rq-add').textContent = '📜 Купить рецепт — ' + t + '₽';
+                haptic('light');
+            };
+            document.getElementById('rq-add').onclick = function() {
+                var found = false;
+                for (var i = 0; i < cart.length; i++) {
+                    if (cart[i].id === mProd.id && cart[i].type === 'recipe') { cart[i].qty += mQty; found = true; break; }
+                }
+                if (!found) {
+                    cart.push({ id: mProd.id, name: mProd.name, emoji: '📜', type: 'recipe', dosage: '-', price: mProd.recipe_price, qty: mQty });
+                }
+                saveCart();
+                closeModal();
+                showToast('✅ Рецепт ' + mProd.name + ' × ' + mQty);
+                haptic('success');
+            };
+
+            document.getElementById('modal').classList.add('show');
+            haptic('light');
+        };
+
+        function closeModal() { document.getElementById('modal').classList.remove('show'); }
+        document.getElementById('modal').onclick = function(e) { if (e.target === this) closeModal(); };
+
+        function saveCart() {
+            try { localStorage.setItem('mh_cart', JSON.stringify(cart)); } catch(e) {}
+            updateBadge();
+        }
+
+        function updateBadge() {
+            var cnt = 0;
+            for (var i = 0; i < cart.length; i++) cnt += cart[i].qty;
+            var b = document.getElementById('badge');
+            if (cnt > 0) { b.style.display = 'flex'; b.textContent = cnt; }
+            else { b.style.display = 'none'; }
+        }
+
+        function showToast(t) {
+            var el = document.getElementById('toast');
+            el.textContent = t;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, 2500);
+        }
+
+        function haptic(s) {
+            try {
+                if (tg && tg.HapticFeedback) {
+                    if (s === 'success') tg.HapticFeedback.notificationOccurred('success');
+                    else tg.HapticFeedback.impactOccurred(s);
+                }
+            } catch(e) {}
+        }
+
+        document.getElementById('search').oninput = renderProducts;
+
+        try {
+            if (tg) {
+                tg.BackButton.show();
+                tg.BackButton.onClick(function() { window.location.href = '/index.html'; });
+            }
+        } catch(e) {}
+
+        // START
+        load();
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Рефералы — MedHelper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="header" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+        <h1>👥 Рефералы</h1>
+        <p>Приглашай друзей — зарабатывай!</p>
+    </div>
+
+    <div class="ref-card">
+        <div style="font-weight:700;font-size:16px;margin-bottom:10px;">🔗 Твоя ссылка:</div>
+        <div class="ref-link" id="ref-link">Загрузка...</div>
+        <button class="modal-add-btn" id="copy-link" style="margin-top:12px;">📋 Скопировать ссылку</button>
+    </div>
+
+    <div class="ref-stats">
+        <div class="ref-stat">
+            <div class="ref-stat-value">100₽</div>
+            <div class="ref-stat-label">За каждого друга</div>
+        </div>
+        <div class="ref-stat">
+            <div class="ref-stat-value">5%</div>
+            <div class="ref-stat-label">От их покупок</div>
+        </div>
+    </div>
+
+    <div class="ref-card">
+        <div style="font-weight:700;font-size:16px;margin-bottom:12px;">📌 Как это работает</div>
+        <div style="font-size:14px;line-height:2;color:var(--hint);">
+            1️⃣ Скопируй реферальную ссылку<br>
+            2️⃣ Отправь другу или в TikTok<br>
+            3️⃣ Друг регистрируется → <b style="color:var(--text);">+100₽</b><br>
+            4️⃣ Друг покупает → <b style="color:var(--text);">+5%</b> тебе<br>
+            5️⃣ Оплачивай заказы с баланса! 💰
+        </div>
+    </div>
+
+    <div class="tiktok-card">
+        <h3>🎬 Тексты для TikTok</h3>
+        <p style="font-size:13px;opacity:0.9;margin-bottom:16px;">Готовые тексты — скопируй и сними видео!</p>
+
+        <div class="tiktok-text" id="tt1">🔥 Устал искать лекарства по аптекам?
+
+💊 32+ препарата с доставкой
+📜 Рецепты онлайн
+💎 Оплата криптой и Stars
+🎁 Бонус 100₽ новым!
+
+#аптека #лекарства #телеграм #здоровье</div>
+        <button class="copy-btn" data-tt="1">📋 Скопировать</button>
+
+        <div class="tiktok-text" id="tt2" style="margin-top:16px;">⚡ Лайфхак: лекарства не выходя из дома
+
+1️⃣ Открой бота в Telegram
+2️⃣ Выбери препарат
+3️⃣ Оплати Stars или криптой
+4️⃣ Получи доставку 📦
+
+#telegram #miniapps #аптекаонлайн</div>
+        <button class="copy-btn" data-tt="2">📋 Скопировать</button>
+
+        <div class="tiktok-text" id="tt3" style="margin-top:16px;">💊 POV: бот который доставляет лекарства
+
+✅ 32 препарата
+✅ Рецепты без очередей
+✅ 1⭐ = 1₽
+✅ Крипто оплата
+
+#медицина #аптека #telegram #лайфхак</div>
+        <button class="copy-btn" data-tt="3">📋 Скопировать</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="nav-bar">
+        <a href="/index.html" class="nav-item"><span class="nav-icon">🏠</span><span>Главная</span></a>
+        <a href="/catalog.html" class="nav-item"><span class="nav-icon">💊</span><span>Каталог</span></a>
+        <a href="/cart.html" class="nav-item"><span class="nav-icon">🛒</span><span>Корзина</span></a>
+        <a href="/referral.html" class="nav-item active"><span class="nav-icon">👥</span><span>Рефералы</span></a>
+    </div>
+
+    <script>
+    (function() {
+        var tg = null;
+        var userId = '0';
+        try {
+            tg = window.Telegram && window.Telegram.WebApp;
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    userId = String(tg.initDataUnsafe.user.id);
+                }
+            }
+        } catch(e) {}
+
+        var botUser = 'preloaded_bot';
+        var refLink = 'https://t.me/' + botUser + '?start=ref' + userId;
+        document.getElementById('ref-link').textContent = refLink;
+
+        function copyText(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text);
+                    return;
+                }
+            } catch(e) {}
+            // Fallback
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch(e) {}
+            document.body.removeChild(ta);
+        }
+
+        document.getElementById('copy-link').onclick = function() {
+            copyText(refLink);
+            showToast('📋 Ссылка скопирована!');
+            haptic('success');
+        };
+
+        // TikTok copy buttons
+        document.querySelectorAll('[data-tt]').forEach(function(btn) {
+            btn.onclick = function() {
+                var num = btn.getAttribute('data-tt');
+                var textEl = document.getElementById('tt' + num);
+                if (textEl) {
+                    copyText(textEl.textContent.trim() + '\n\n🔗 ' + refLink);
+                    showToast('📋 Текст + ссылка скопированы!');
+                    haptic('success');
+                }
+            };
+        });
+
+        function showToast(t) {
+            var el = document.getElementById('toast');
+            el.textContent = t;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, 2500);
+        }
+
+        function haptic(s) {
+            try {
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(s);
+            } catch(e) {}
+        }
+
+        try {
+            if (tg) {
+                tg.BackButton.show();
+                tg.BackButton.onClick(function() { window.location.href = '/index.html'; });
+            }
+        } catch(e) {}
+    })();
+    </script>
+</body>
+</html>

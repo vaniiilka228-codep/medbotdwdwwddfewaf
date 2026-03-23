@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Профиль — MedHelper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="header" style="background: linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%);">
+        <h1>👤 Профиль</h1>
+        <p id="user-name">Загрузка...</p>
+    </div>
+
+    <div class="profile-card">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name" id="pname">Пользователь</div>
+        <div class="profile-id" id="pid">ID: загрузка...</div>
+    </div>
+
+    <div class="ref-stats">
+        <div class="ref-stat"><div class="ref-stat-value glow-text" id="pbalance">0₽</div><div class="ref-stat-label">Баланс</div></div>
+        <div class="ref-stat"><div class="ref-stat-value glow-text" id="porders">0</div><div class="ref-stat-label">Заказов</div></div>
+        <div class="ref-stat"><div class="ref-stat-value glow-text" id="prefs">0</div><div class="ref-stat-label">Рефералов</div></div>
+        <div class="ref-stat"><div class="ref-stat-value glow-text" id="pspent">0₽</div><div class="ref-stat-label">Потрачено</div></div>
+    </div>
+
+    <div class="ref-card">
+        <div style="font-weight:700;font-size:16px;margin-bottom:12px;color:var(--neon3);">📖 Команды бота</div>
+        <div style="font-size:14px;line-height:2;color:var(--text2);">
+            💊 /catalog — каталог<br>
+            🛒 /cart — корзина<br>
+            📋 /orders — заказы<br>
+            👥 /referral — рефералы<br>
+            ⭐ /review — отзыв<br>
+            🎟 /promo — промокод<br>
+            💬 /help — помощь
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <a href="/index.html" class="nav-item"><span class="nav-icon">🏠</span><span>Главная</span></a>
+        <a href="/catalog.html" class="nav-item"><span class="nav-icon">💊</span><span>Каталог</span></a>
+        <a href="/cart.html" class="nav-item"><span class="nav-icon">🛒</span><span>Корзина</span></a>
+        <a href="/profile.html" class="nav-item active"><span class="nav-icon">👤</span><span>Профиль</span></a>
+        <a href="/referral.html" class="nav-item"><span class="nav-icon">👥</span><span>Рефералы</span></a>
+    </div>
+
+    <script>
+    (function(){
+        try {
+            var tg=window.Telegram&&window.Telegram.WebApp;
+            if(tg){
+                tg.ready();tg.expand();
+                tg.setHeaderColor('#1e1b4b');tg.setBackgroundColor('#0a0a1a');
+                tg.BackButton.show();
+                tg.BackButton.onClick(function(){window.location.href='/index.html';});
+                if(tg.initDataUnsafe&&tg.initDataUnsafe.user){
+                    var u=tg.initDataUnsafe.user;
+                    document.getElementById('pname').textContent=(u.first_name||'')+(u.last_name?' '+u.last_name:'');
+                    document.getElementById('pid').textContent='ID: '+u.id;
+                    document.getElementById('user-name').textContent=(u.first_name||'User');
+                }
+            }
+        }catch(e){}
+    })();
+    </script>
+</body>
+</html>
